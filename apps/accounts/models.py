@@ -283,6 +283,16 @@ class User(AbstractBaseUser, PermissionsMixin):
         full_name = f"{self.first_name} {self.last_name}".strip()
         return full_name or self.display_name
 
+    @property
+    def full_name(self):
+        """Property alias for get_full_name() for serializer compatibility."""
+        return self.get_full_name()
+
+    @property
+    def avatar_url(self):
+        """Property alias for profile_photo_url for serializer compatibility."""
+        return self.profile_photo_url
+
     def get_short_name(self):
         """Return the short name for the user."""
         return self.first_name or self.display_name

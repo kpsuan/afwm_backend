@@ -17,6 +17,8 @@ from .views import (
     UpdateMembershipView,
     TransferLeadershipView,
     PendingInvitationsView,
+    ValidatePendingInvitationView,
+    ClaimPendingInvitationView,
 )
 
 urlpatterns = [
@@ -33,6 +35,8 @@ urlpatterns = [
     path('<uuid:id>/invite/', InviteMemberView.as_view(), name='invite-member'),
     path('accept-invitation/', AcceptInvitationView.as_view(), name='accept-invitation'),
     path('decline-invitation/', DeclineInvitationView.as_view(), name='decline-invitation'),
+    path('validate-invitation/', ValidatePendingInvitationView.as_view(), name='validate-pending-invitation'),
+    path('claim-invitation/', ClaimPendingInvitationView.as_view(), name='claim-pending-invitation'),
 
     # Team Actions
     path('<uuid:id>/leave/', LeaveTeamView.as_view(), name='leave-team'),

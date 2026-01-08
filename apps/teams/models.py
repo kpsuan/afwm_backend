@@ -98,6 +98,14 @@ class Team(models.Model):
             models.Index(fields=['created_by'], name='idx_teams_created_by'),
             models.Index(fields=['deleted_at'], name='idx_teams_deleted_at'),
         ]
+        constraints = [
+            # Each user can only have one team with a given name (excludes deleted teams)
+            models.UniqueConstraint(
+                fields=['created_by', 'name'],
+                condition=models.Q(deleted_at__isnull=True),
+                name='unique_team_name_per_user'
+            ),
+        ]
 
     def __str__(self):
         """String representation of the team."""
@@ -387,3 +395,118 @@ class TeamMembership(models.Model):
         self.status = self.STATUS_LEFT
         self.left_at = timezone.now()
         self.save(update_fields=['status', 'left_at', 'updated_at'])
+
+
+class PendingInvitation(models.Model):
+    """
+    Pending invitation for users who don't have an account yet.
+
+    When a team leader invites someone who isn't registered, we store the
+    invitation here. When they sign up, we automatically create their
+    TeamMembership and delete the pending invitation.
+    """
+
+    # Primary Key
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+        help_text=_('Unique identifier for the pending invitation')
+    )
+
+    # Invitation details
+    email = models.EmailField(
+        _('email'),
+        help_text=_('Email address of the person being invited')
+    )
+    team = models.ForeignKey(
+        Team,
+        on_delete=models.CASCADE,
+        related_name='pending_invitations',
+        help_text=_('The team they are being invited to')
+    )
+    role = models.CharField(
+        _('role'),
+        max_length=20,
+        choices=TeamMembership.ROLE_CHOICES,
+        default=TeamMembership.ROLE_MEMBER,
+        help_text=_('Role they will have when they join')
+    )
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='pending_invitations_sent',
+        help_text=_('User who sent the invitation')
+    )
+
+    # Custom message from inviter
+    message = models.TextField(
+        _('message'),
+        blank=True,
+        default='',
+        help_text=_('Custom message from the inviter')
+    )
+
+    # Token for signup link
+    invitation_token = models.CharField(
+        _('invitation token'),
+        max_length=255,
+        unique=True,
+        help_text=_('Unique token for the signup invitation link')
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(
+        _('created at'),
+        default=timezone.now,
+        help_text=_('When the invitation was sent')
+    )
+    expires_at = models.DateTimeField(
+        _('expires at'),
+        help_text=_('When the invitation expires')
+    )
+
+    class Meta:
+        db_table = 'pending_invitations'
+        verbose_name = _('pending invitation')
+        verbose_name_plural = _('pending invitations')
+        ordering = ['-created_at']
+        unique_together = [['email', 'team']]
+        indexes = [
+            models.Index(fields=['email'], name='idx_pi_email'),
+            models.Index(fields=['invitation_token'], name='idx_pi_token'),
+            models.Index(fields=['team'], name='idx_pi_team'),
+        ]
+
+    def __str__(self):
+        return f"Pending invitation for {self.email} to {self.team.name}"
+
+    @property
+    def is_expired(self):
+        """Check if the invitation has expired."""
+        return timezone.now() > self.expires_at
+
+    def convert_to_membership(self, user):
+        """
+        Convert this pending invitation to a real TeamMembership.
+        Called when the invited user signs up.
+
+        Args:
+            user: The newly registered user
+
+        Returns:
+            TeamMembership: The created membership
+        """
+        membership = TeamMembership.objects.create(
+            team=self.team,
+            user=user,
+            role=self.role,
+            status=TeamMembership.STATUS_ACTIVE,
+            invited_by=self.invited_by,
+            joined_at=timezone.now(),
+            is_default_guardian=True,
+            is_default_emergency_contact=True,
+        )
+        # Delete this pending invitation
+        self.delete()
+        return membership

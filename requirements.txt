@@ -41,3 +41,11 @@ channels-redis==4.2.1  # Redis channel layer for Channels
 
 # Background tasks (optional, uncomment when needed)
 # celery==5.4.0  # Background tasks
+
+# Testing
+pytest==8.3.4
+pytest-django==4.9.0
+pytest-cov==6.0.0
+pytest-asyncio==0.24.0
+factory-boy==3.3.1  # Test factories for model instances
+faker==33.1.0  # Generate fake data for tests

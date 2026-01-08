@@ -26,5 +26,5 @@ urlpatterns = [
     path('api/v1/teams/', include('apps.teams.urls')),  # Teams API enabled
     path('api/v1/content/', include('apps.content.urls')),  # Content API enabled
     path('api/v1/user/', include('apps.responses.urls')),  # User responses API enabled
-    # path('api/v1/communication/', include('apps.communication.urls')),
+    path('api/v1/', include('apps.communication.urls')),  # Notifications API enabled
 ]

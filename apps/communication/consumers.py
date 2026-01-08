@@ -202,8 +202,17 @@ class NotificationConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def mark_notification_read(self, notification_id):
         """Mark a notification as read."""
-        # TODO: Implement when Notification model is created
-        pass
+        from .models import Notification
+
+        try:
+            notification = Notification.objects.get(
+                id=notification_id,
+                user=self.user
+            )
+            notification.mark_as_read()
+            return True
+        except Notification.DoesNotExist:
+            return False
 
 
 # ----- Utility functions for sending notifications -----

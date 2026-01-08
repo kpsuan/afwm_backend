@@ -236,6 +236,14 @@ class Option(models.Model):
     # Display
     display_order = models.IntegerField(_('display order'))
 
+    # Media
+    image_url = models.TextField(
+        _('image URL'),
+        blank=True,
+        default='',
+        help_text=_('Cloudinary URL for option card image')
+    )
+
     # Timestamps
     created_at = models.DateTimeField(_('created at'), default=timezone.now)
     updated_at = models.DateTimeField(_('updated at'), auto_now=True)

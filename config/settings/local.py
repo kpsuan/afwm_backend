@@ -134,3 +134,26 @@ CLOUDINARY_STORAGE = {
 # Only enable Cloudinary storage if credentials are configured
 if CLOUDINARY_STORAGE.get('CLOUD_NAME'):
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+    # Initialize cloudinary SDK with credentials
+    import cloudinary
+    cloudinary.config(
+        cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
+        api_key=CLOUDINARY_STORAGE['API_KEY'],
+        api_secret=CLOUDINARY_STORAGE['API_SECRET'],
+        secure=True
+    )
+
+
+# Channel Layers for WebSocket (Redis required for cross-process messaging)
+# InMemoryChannelLayer doesn't work across processes, so we need Redis
+# even in development for real-time notifications to work.
+# Start Redis with: redis-server (or use Docker: docker run -p 6379:6379 redis)
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [os.environ.get('REDIS_URL', 'redis://127.0.0.1:6379/0')],
+        },
+    },
+}

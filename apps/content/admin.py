@@ -90,6 +90,19 @@ class LayerAdminForm(forms.ModelForm):
         fields = '__all__'
 
 
+class OptionAdminForm(forms.ModelForm):
+    """Form for Option with image upload."""
+    image_upload = forms.ImageField(
+        required=False,
+        label='Upload New Image',
+        help_text='Upload a new image (JPG, PNG, GIF, WebP). Max 10MB.'
+    )
+
+    class Meta:
+        model = Option
+        fields = '__all__'
+
+
 class ComponentAdminForm(forms.ModelForm):
     """Form for Component with image upload."""
     image_upload = forms.ImageField(
@@ -117,7 +130,7 @@ class OptionInline(admin.TabularInline):
     """Inline admin for options within a layer."""
     model = Option
     extra = 0
-    fields = ['option_number', 'option_text', 'display_order']
+    fields = ['option_number', 'option_text', 'display_order', 'image_url']
     show_change_link = True
 
 
@@ -293,8 +306,10 @@ class LayerAdmin(admin.ModelAdmin, CloudinaryImageMixin):
 
 
 @admin.register(Option)
-class OptionAdmin(admin.ModelAdmin):
-    """Admin for Option model."""
+class OptionAdmin(admin.ModelAdmin, CloudinaryImageMixin):
+    """Admin for Option model with image upload."""
+
+    form = OptionAdminForm
 
     list_display = [
         'question',
@@ -302,6 +317,7 @@ class OptionAdmin(admin.ModelAdmin):
         'option_text_preview',
         'layer',
         'display_order',
+        'image_preview_list',
         'component_count'
     ]
     list_filter = ['question', 'layer']
@@ -315,12 +331,16 @@ class OptionAdmin(admin.ModelAdmin):
         ('Display', {
             'fields': ['display_order']
         }),
+        ('Image', {
+            'fields': ['image_preview', 'image_upload', 'image_url'],
+            'description': 'Upload an image for this option card.'
+        }),
         ('Timestamps', {
             'fields': ['created_at', 'updated_at'],
             'classes': ['collapse']
         })
     ]
-    readonly_fields = ['created_at', 'updated_at']
+    readonly_fields = ['created_at', 'updated_at', 'image_preview']
 
     inlines = [ComponentInline]
 
@@ -333,6 +353,36 @@ class OptionAdmin(admin.ModelAdmin):
         """Show count of components for this option."""
         return obj.components.count()
     component_count.short_description = 'Components'
+
+    def image_preview(self, obj):
+        """Show image preview."""
+        if obj.image_url:
+            return format_html(
+                '<img src="{}" style="max-width: 400px; max-height: 300px; border-radius: 8px;" />',
+                obj.image_url
+            )
+        return "No image uploaded"
+    image_preview.short_description = 'Current Image'
+
+    def image_preview_list(self, obj):
+        """Show small image preview in list."""
+        if obj.image_url:
+            return format_html(
+                '<img src="{}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" />',
+                obj.image_url
+            )
+        return "-"
+    image_preview_list.short_description = 'Image'
+
+    def save_model(self, request, obj, form, change):
+        """Handle image upload on save."""
+        image_file = form.cleaned_data.get('image_upload')
+        if image_file:
+            folder = f'awfm/options/{obj.question_id}_opt{obj.option_number}'
+            image_url, _ = self.upload_to_cloudinary(image_file, folder)
+            if image_url:
+                obj.image_url = image_url
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Component)

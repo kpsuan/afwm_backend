@@ -45,6 +45,7 @@ class OptionSerializer(serializers.ModelSerializer):
             'option_number',
             'option_text',
             'display_order',
+            'image_url',
             'components',  # Nested
             'created_at',
             'updated_at'

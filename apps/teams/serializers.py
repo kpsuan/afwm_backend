@@ -7,7 +7,7 @@ Serializers for team management and memberships.
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Team, TeamMembership
+from .models import Team, TeamMembership, PendingInvitation
 
 User = get_user_model()
 
@@ -72,13 +72,28 @@ class TeamSerializer(serializers.ModelSerializer):
         )
 
     def get_member_count(self, obj):
-        """Get count of active members."""
+        """Get count of active members.
+
+        Uses prefetched memberships if available to avoid extra queries.
+        """
+        # Check if memberships are prefetched
+        if hasattr(obj, '_prefetched_objects_cache') and 'memberships' in obj._prefetched_objects_cache:
+            return sum(1 for m in obj.memberships.all() if m.status == 'active')
         return obj.memberships.filter(status='active').count()
 
     def get_my_role(self, obj):
-        """Get the current user's role in this team."""
+        """Get the current user's role in this team.
+
+        Uses prefetched memberships if available to avoid extra queries.
+        """
         request = self.context.get('request')
         if request and request.user.is_authenticated:
+            # Check if memberships are prefetched
+            if hasattr(obj, '_prefetched_objects_cache') and 'memberships' in obj._prefetched_objects_cache:
+                for m in obj.memberships.all():
+                    if m.user_id == request.user.id and m.status == 'active':
+                        return m.role
+                return None
             membership = obj.memberships.filter(user=request.user, status='active').first()
             if membership:
                 return membership.role
@@ -97,6 +112,19 @@ class CreateTeamSerializer(serializers.ModelSerializer):
             'avatar_url': {'required': False},
             'team_level': {'required': False},
         }
+
+    def validate_name(self, value):
+        """Check that user doesn't already have a team with this name."""
+        user = self.context['request'].user
+        if Team.objects.filter(
+            created_by=user,
+            name__iexact=value,
+            deleted_at__isnull=True
+        ).exists():
+            raise serializers.ValidationError(
+                f'You already have a team named "{value}". Please choose a different name.'
+            )
+        return value
 
     def create(self, validated_data):
         """Create team and add creator as leader."""
@@ -192,3 +220,25 @@ class UpdateMembershipSerializer(serializers.ModelSerializer):
                     "Cannot remove leader role. Assign another leader first."
                 )
         return value
+
+
+class PendingInvitationSerializer(serializers.ModelSerializer):
+    """Serializer for displaying pending invitation info (for non-registered users)."""
+    team_name = serializers.CharField(source='team.name', read_only=True)
+    invited_by_name = serializers.CharField(source='invited_by.display_name', read_only=True)
+
+    class Meta:
+        model = PendingInvitation
+        fields = (
+            'id',
+            'email',
+            'team',
+            'team_name',
+            'role',
+            'invited_by',
+            'invited_by_name',
+            'message',
+            'created_at',
+            'expires_at',
+        )
+        read_only_fields = fields
